@@ -1,0 +1,15 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /food-images/{userId}/{imageId} {
+      // Allow read if user is authenticated
+      allow read: if request.auth != null;
+      // Allow write if user is authenticated and matches the userId in the path
+      // And strict size validation (though we do client side too) of < 5MB
+      allow write: if request.auth != null 
+                   && request.auth.uid == userId
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
+  }
+}
