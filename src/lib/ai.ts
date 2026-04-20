@@ -1,5 +1,5 @@
 // Groq API implementation for route optimization
-// Using llama-3-8b-8192 for fast, high-quality JSON generation
+// Using llama-3.3-70b-versatile for fast, high-quality JSON generation
 
 export interface Location {
     id: string;
@@ -94,7 +94,7 @@ export async function getOptimizedRoute(
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: 'llama3-8b-8192',
+                model: 'llama-3.3-70b-versatile',
                 messages: [
                     { role: 'system', content: 'You are a logistics JSON assistant.' },
                     { role: 'user', content: prompt }
@@ -142,7 +142,7 @@ export async function getOptimizedRoute(
         return {
             data: {
                 optimizedStopOrder,
-                routeSummary: `Route optimized by Groq (Llama 3). Total distance: ${totalDistanceKm.toFixed(1)} km.`,
+                routeSummary: `Route optimized by Groq (Llama 3.3). Total distance: ${totalDistanceKm.toFixed(1)} km.`,
                 estimatedTotalDistanceKm: totalDistanceKm,
                 estimatedTotalDurationMinutes: totalDurationMinutes
             }
