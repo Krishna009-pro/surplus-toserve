@@ -3,7 +3,7 @@ services:
     name: surplus-to-serve
     runtime: static
     buildCommand: npm install && npm run build
-    staticPublishPath: dist
+    staticPublishPath: ./dist
     envVars:
       - key: VITE_FIREBASE_API_KEY
         sync: false
