@@ -88,13 +88,15 @@ export async function getOptimizedRoute(
             ${JSON.stringify(input.ngoLocations)}
 
             Task: Create an optimized route starting from the volunteer's location.
-            Constraint: All Donors must be visited before ANY NGO. This is a strict rule. Pickups first, then Deliveries.
+            Objective: Minimize total travel distance. Prioritize clustering nearby stops.
+            Constraint: All Donors must be visited before ANY NGO. This is a strict rule (Pickup Phase -> Delivery Phase).
             
             Return ONLY a JSON object with this exact structure:
             {
-                "stop_order_ids": ["id1", "id2", ...]
+                "stop_order_ids": ["id1", "id2", ...],
+                "ai_reasoning": "A short, one-sentence explanation of why this route is optimal."
             }
-            Do not include markdown formatting like \`\`\`json. Just the raw JSON or wrapped in standard code block.
+            Do not include markdown formatting like \`\`\`json. Just the raw JSON.
         `;
 
         const result = await model.generateContent(prompt);
@@ -130,14 +132,14 @@ export async function getOptimizedRoute(
             prevLon = stop.longitude;
         }
 
-        // Estimate duration (assume 30km/h average in city)
+        // Estimate duration (assume 30km/h average in city including stops)
         const averageSpeedKmH = 30;
-        const totalDurationMinutes = (totalDistanceKm / averageSpeedKmH) * 60;
+        const totalDurationMinutes = (totalDistanceKm / averageSpeedKmH) * 60 + (optimizedStopOrder.length * 5); // +5 mins per stop
 
         return {
             data: {
                 optimizedStopOrder,
-                routeSummary: `Optimized route with ${optimizedStopOrder.length} stops. Total distance: ${totalDistanceKm.toFixed(1)} km.`,
+                routeSummary: parsed.ai_reasoning || `Optimized route with ${optimizedStopOrder.length} stops. Total distance: ${totalDistanceKm.toFixed(1)} km.`,
                 estimatedTotalDistanceKm: totalDistanceKm,
                 estimatedTotalDurationMinutes: totalDurationMinutes
             }
