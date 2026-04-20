@@ -31,7 +31,7 @@ export default function AdminDonations() {
     useEffect(() => {
         const fetchDonations = async () => {
             try {
-                const q = query(collection(db, "donations"), orderBy("createdAt", "desc"));
+                const q = query(collection(db, "donations"));
                 const querySnapshot = await getDocs(q);
                 const donationsData = querySnapshot.docs.map((doc) => ({
                     id: doc.id,
@@ -82,8 +82,8 @@ export default function AdminDonations() {
                             {donations.map((donation) => (
                                 <TableRow key={donation.id}>
                                     <TableCell>
-                                        {donation.createdAt?.seconds
-                                            ? format(new Date(donation.createdAt.seconds * 1000), "PP")
+                                        {donation.createdAt
+                                            ? format(new Date(donation.createdAt.seconds ? donation.createdAt.seconds * 1000 : donation.createdAt), "PP")
                                             : "N/A"}
                                     </TableCell>
                                     <TableCell className="font-medium">{donation.donorName}</TableCell>

@@ -109,6 +109,38 @@ export function AppSidebar() {
 
   let items = donorItems;
   let roleLabel = "Donor Account";
+  const [profileMissing, setProfileMissing] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setRole(null);
+        setEmail(null);
+        setUserName(null);
+        setApproved(false);
+        setProfileMissing(false);
+        return;
+      }
+
+      setEmail(user.email);
+      setUserName(user.displayName || user.email?.split('@')[0] || "User");
+
+      // Fetch role from Firestore
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        setRole(data.role);
+        setApproved(data.approved === true);
+        if (data.name) setUserName(data.name);
+        setProfileMissing(false);
+      } else {
+        console.error("[Sidebar] Profile document missing for UID:", user.uid);
+        setProfileMissing(true);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   if (role === 'ngo') {
     roleLabel = "NGO Partner";
@@ -117,10 +149,11 @@ export function AppSidebar() {
     } else {
       items = ngoItems;
     }
-  }
-  if (role === 'admin') {
+  } else if (role === 'admin') {
     roleLabel = "Administrator";
     items = adminItems;
+  } else if (profileMissing) {
+    roleLabel = "Profile Missing (Check UID)";
   }
 
   return (
@@ -135,7 +168,7 @@ export function AppSidebar() {
               {!isCollapsed && (
                 <div className="grid flex-1 text-left text-sm leading-tight ml-2 animate-in fade-in zoom-in-95 duration-300">
                   <span className="truncate font-bold text-lg tracking-tight">Surplus2Serve</span>
-                  <span className="truncate text-xs font-medium text-muted-foreground">{roleLabel}</span>
+                  <span className={`truncate text-xs font-medium ${profileMissing ? 'text-red-500 animate-pulse' : 'text-muted-foreground'}`}>{roleLabel}</span>
                 </div>
               )}
             </SidebarMenuButton>

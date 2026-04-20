@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { db } from "@backend/firebase";
+import { auth, db } from "@backend/firebase";
 import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
 import {
   Table,
@@ -44,7 +44,28 @@ const AdminUsers = () => {
       toast.success("User approved successfully");
       fetchUsers();
     } catch (error: any) {
-      toast.error("Failed to approve user: " + error.message);
+      console.error("ADMIN ACTION ERROR (Approve):", error);
+      if (error.code === 'permission-denied') {
+        toast.error("Access Denied: Your account does not have Admin permissions.");
+      } else {
+        toast.error("Failed to approve user: " + error.message);
+      }
+    }
+  };
+
+  const handleRejectUser = async (userId: string) => {
+    try {
+      const userRef = doc(db, "users", userId);
+      await updateDoc(userRef, { approved: false });
+      toast.success("User access revoked");
+      fetchUsers();
+    } catch (error: any) {
+      console.error("ADMIN ACTION ERROR (Reject):", error);
+      if (error.code === 'permission-denied') {
+        toast.error("Access Denied: Your account does not have Admin permissions.");
+      } else {
+        toast.error("Failed to reject user: " + error.message);
+      }
     }
   };
 
@@ -93,14 +114,20 @@ const AdminUsers = () => {
             {filteredUsers.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>
-                  <div className="font-medium text-foreground">
-                    {user.organizationName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'User'}
+                  <div className="font-medium text-foreground flex items-center gap-2">
+                    {(() => {
+                      const hasRealOrg = user.organizationName && user.organizationName.toLowerCase() !== 'self';
+                      return hasRealOrg ? user.organizationName : `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'User';
+                    })()}
+                    {user.id === auth.currentUser?.uid && (
+                      <Badge variant="outline" className="text-[10px] bg-primary/5 text-primary border-primary/20">You</Badge>
+                    )}
                   </div>
-                  {user.organizationName && (
+                  {user.organizationName && user.organizationName.toLowerCase() !== 'self' && (
                     <div className="text-xs text-muted-foreground">{user.firstName} {user.lastName}</div>
                   )}
                   {user.role === 'ngo' && !user.approved && (
-                    <Badge variant="destructive" className="ml-2 text-[10px]">Pending Approval</Badge>
+                    <Badge variant="destructive" className="text-[10px]">Pending Approval</Badge>
                   )}
                 </TableCell>
                 <TableCell>
@@ -128,17 +155,20 @@ const AdminUsers = () => {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
-                    {user.role === 'ngo' && !user.approved && (
-                      <Button size="sm" className="h-8 bg-green-600 hover:bg-green-700" onClick={() => handleApproveUser(user.id)} title="Approve NGO">
-                        <Check className="h-4 w-4 mr-1" /> Approve
-                      </Button>
+                    {user.id !== auth.currentUser?.uid && user.role === 'ngo' && (
+                      !user.approved ? (
+                        <Button size="sm" className="h-8 bg-green-600 hover:bg-green-700" onClick={() => handleApproveUser(user.id)} title="Approve NGO">
+                          <Check className="h-4 w-4 mr-1" /> Approve
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="outline" className="h-8 text-red-600 border-red-100 hover:bg-red-50" onClick={() => handleRejectUser(user.id)} title="Reject/Revoke NGO">
+                          <UserMinus className="h-4 w-4 mr-1" /> Reject
+                        </Button>
+                      )
                     )}
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Manage Permissions">
-                      <ShieldCheck className="h-4 w-4 text-blue-600" />
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Suspend User">
-                      <UserMinus className="h-4 w-4 text-red-600" />
-                    </Button>
+                    {user.id === auth.currentUser?.uid && (
+                      <span className="text-xs text-muted-foreground italic mr-2">System Admin</span>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>

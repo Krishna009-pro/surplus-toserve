@@ -113,8 +113,13 @@ export function useAdminStats(enabled: boolean = true) {
 
                 // Client-side role check (Defense in Depth)
                 const userDoc = await getDoc(doc(db, "users", user.uid));
-                if (userDoc.data()?.role !== 'admin') {
-                    console.error("Unauthorized attempt to access Admin Stats");
+                const userData = userDoc.data();
+                
+                console.log("[Auth Check] Current UID:", user.uid);
+                console.log("[Auth Check] Firestore Role Found:", userData?.role);
+
+                if (userData?.role !== 'admin') {
+                    console.error("Unauthorized attempt to access Admin Stats. Required: admin, Found:", userData?.role);
                     throw new Error("Unauthorized: Admin access required.");
                 }
 
