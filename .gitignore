@@ -14,6 +14,8 @@ dist-ssr
 .env
 .env.*
 !.env.example
+"lovable files for dashboard/"
+"map feature for firebase studio/"
 
 # Editor directories and files
 .vscode/*
@@ -29,4 +31,8 @@ dist-ssr
 *.json
 !package.json
 !package-lock.json
+
+
+lovable files for dashboard
+map feature for firebase studio
 
