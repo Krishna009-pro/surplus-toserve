@@ -1,5 +1,6 @@
-import { auth, db } from "@backend/firebase";
+import { auth, db, storage } from "@backend/firebase";
 import { collection, addDoc, doc, getDoc } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useNavigate } from "react-router-dom";
 import imageCompression from 'browser-image-compression';
 import { useState } from "react";
@@ -39,27 +40,49 @@ export default function Donate() {
       if (!user) throw new Error("User not authenticated");
 
       // Fetch user profile to get organization name
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      const userData = userDoc.exists() ? userDoc.data() : {};
+      let userData: any = {};
+      try {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        userData = userDoc.exists() ? userDoc.data() : {};
+      } catch (profileErr) {
+        console.warn("Could not fetch user profile (permission or missing doc):", profileErr);
+        // We continue with empty userData - it shouldn't block the donation
+      }
       const donorName = userData.organizationName || `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || 'Anonymous';
 
       let imageUrl = "";
 
       if (imageFile) {
+        let compressedFile: any = null;
         try {
-          // Strict compression for Firestore limit (1MB max doc size)
+          // Compress before upload
           const options = {
-            maxSizeMB: 0.6,
-            maxWidthOrHeight: 800,
+            maxSizeMB: 1,
+            maxWidthOrHeight: 1200,
             useWebWorker: true
           };
-          const compressedFile = await imageCompression(imageFile, options);
-          imageUrl = await blobToBase64(compressedFile);
+          compressedFile = await imageCompression(imageFile, options);
+          
+          // Generate a unique filename
+          const fileExtension = imageFile.name.split('.').pop();
+          const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExtension}`;
+          const storageRef = ref(storage, `food-images/${user.uid}/${fileName}`);
+          
+          // Upload to Firebase Storage
+          console.log("Uploading image to storage...");
+          const uploadResult = await uploadBytes(storageRef, compressedFile);
+          imageUrl = await getDownloadURL(uploadResult.ref);
+          console.log("Image uploaded successfully:", imageUrl);
         } catch (error) {
-          console.error("Image processing error:", error);
-          toast.error("Failed to process image. Try a smaller one.");
-          setLoading(false);
-          return;
+          console.warn("Storage upload failed (CORS or Bucket issue), falling back to Base64:", error);
+          try {
+            // Fallback: Convert the compressed file to Base64 for direct Firestore storage
+            imageUrl = await blobToBase64(compressedFile);
+            toast.info("Stored via fallback mode (Storage unavailable).");
+          } catch (fallbackErr) {
+            console.error("Base64 fallback also failed:", fallbackErr);
+            toast.error("Failed to process image. Continuing without it.");
+          }
         }
       }
 
@@ -71,15 +94,18 @@ export default function Donate() {
         pickupAddress,
         expiryTime: new Date(expiryTime).toISOString(),
         status: 'available',
-        imageUrl, // Saving Base64 string directly
+        imageUrl, // Now storing a real URL instead of Base64
         createdAt: new Date().toISOString()
       });
 
       toast.success("Donation created successfully!");
       navigate("/donations");
     } catch (error: any) {
-      console.error(error);
-      toast.error(error.message);
+      console.error("Donation submission error:", error);
+      if (error.message?.includes("permission")) {
+        console.error("HINT: If you just registered, your profile 'Write' might have been blocked by an ad-blocker. Try refreshing or disabling ad-blockers.");
+      }
+      toast.error(`Submission failed: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -157,7 +183,7 @@ export default function Donate() {
                   }
                 }}
               />
-              <p className="text-xs text-muted-foreground">Image will be stored directly in the database.</p>
+              <p className="text-xs text-muted-foreground">Image will be stored in Firebase Storage.</p>
             </div>
 
             <Button type="submit" className="w-full" disabled={loading}>

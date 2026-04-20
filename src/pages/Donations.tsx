@@ -13,20 +13,33 @@ export default function Donations() {
   const [loading, setLoading] = useState(true);
 
   const fetchDonations = async () => {
-    const user = auth.currentUser;
-    if (!user) return;
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        console.warn("fetchDonations: No authenticated user found.");
+        return;
+      }
 
-    const q = query(
-      collection(db, "donations"),
-      where("donorId", "==", user.uid),
-      orderBy("createdAt", "desc")
-    );
+      console.log("Fetching donations for user:", user.uid);
+      const q = query(
+        collection(db, "donations"),
+        where("donorId", "==", user.uid),
+        orderBy("createdAt", "desc")
+      );
 
-    const snapshot = await getDocs(q);
-    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-    setDonations(data);
-    setLoading(false);
+      setDonations(data);
+    } catch (error: any) {
+      console.error("FIREBASE FETCH ERROR:", error);
+      if (error.message?.includes("permissions")) {
+        console.error("HINT: This usually means an ad-blocker is blocking firestore.googleapis.com or your firestore.rules need deployment.");
+      }
+      toast.error("Failed to fetch donations. Check console for details.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {

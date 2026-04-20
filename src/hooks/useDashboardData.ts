@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { auth, db } from "@backend/firebase";
-import { doc, getDoc, collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, orderBy, limit, getCountFromServer } from "firebase/firestore";
 
 export type UserRole = "donor" | "ngo" | "admin" | null;
 
@@ -38,9 +38,10 @@ export function useProfile() {
     });
 }
 
-export function useDonorStats() {
+export function useDonorStats(enabled: boolean = true) {
     return useQuery({
         queryKey: ["donor-stats"],
+        enabled,
         queryFn: async () => {
             const user = auth.currentUser;
             if (!user) return null;
@@ -66,9 +67,10 @@ export function useDonorStats() {
     });
 }
 
-export function useNgoStats() {
+export function useNgoStats(enabled: boolean = true) {
     return useQuery({
         queryKey: ["ngo-stats"],
+        enabled,
         queryFn: async () => {
             const user = auth.currentUser;
             if (!user) return null;
@@ -100,42 +102,78 @@ export function useNgoStats() {
     });
 }
 
-export function useAdminStats() {
+export function useAdminStats(enabled: boolean = true) {
     return useQuery({
         queryKey: ["admin-stats"],
+        enabled,
         queryFn: async () => {
-            const usersSnap = await getDocs(collection(db, "users"));
-            const donationsSnap = await getDocs(collection(db, "donations"));
+            try {
+                const user = auth.currentUser;
+                if (!user) return null;
 
-            const totalUsers = usersSnap.size;
-            const totalDonations = donationsSnap.size;
-            const activeListings = donationsSnap.docs.filter(d => d.data().status === "available").length;
-            const completedDonations = donationsSnap.docs.filter(d => d.data().status === "completed").length;
+                // Client-side role check (Defense in Depth)
+                const userDoc = await getDoc(doc(db, "users", user.uid));
+                if (userDoc.data()?.role !== 'admin') {
+                    console.error("Unauthorized attempt to access Admin Stats");
+                    throw new Error("Unauthorized: Admin access required.");
+                }
 
-            const donorCount = usersSnap.docs.filter(u => u.data().role === 'donor').length;
-            const ngoCount = usersSnap.docs.filter(u => u.data().role === 'ngo').length;
+                // Aggregation queries - much faster than fetching all docs
+                const usersColl = collection(db, "users");
+                const donationsColl = collection(db, "donations");
 
-            const roleDistribution = [
-                { name: "Donors", value: donorCount, color: "#10b981" },
-                { name: "NGOs", value: ngoCount, color: "#3b82f6" },
-                { name: "Admins", value: totalUsers - donorCount - ngoCount, color: "#6366f1" }
-            ].filter(i => i.value > 0);
+                const [
+                    totalUsersSnap,
+                    totalDonationsSnap,
+                    activeListingsSnap,
+                    completedDonationsSnap,
+                    donorCountSnap,
+                    ngoCountSnap
+                ] = await Promise.all([
+                    getCountFromServer(usersColl),
+                    getCountFromServer(donationsColl),
+                    getCountFromServer(query(donationsColl, where("status", "==", "available"))),
+                    getCountFromServer(query(donationsColl, where("status", "==", "completed"))),
+                    getCountFromServer(query(usersColl, where("role", "==", "donor"))),
+                    getCountFromServer(query(usersColl, where("role", "==", "ngo")))
+                ]);
 
-            return {
-                totalUsers,
-                totalDonations,
-                activeListings,
-                completedDonations,
-                totalMeals: completedDonations * 10,
-                roleDistribution
-            };
+                const totalUsers = totalUsersSnap.data().count;
+                const totalDonations = totalDonationsSnap.data().count;
+                const activeListings = activeListingsSnap.data().count;
+                const completedDonations = completedDonationsSnap.data().count;
+                const donorCount = donorCountSnap.data().count;
+                const ngoCount = ngoCountSnap.data().count;
+
+                const roleDistribution = [
+                    { name: "Donors", value: donorCount, color: "#10b981" },
+                    { name: "NGOs", value: ngoCount, color: "#3b82f6" },
+                    { name: "Admins", value: Math.max(0, totalUsers - donorCount - ngoCount), color: "#6366f1" }
+                ].filter(i => i.value > 0);
+
+                return {
+                    totalUsers,
+                    totalDonations,
+                    activeListings,
+                    completedDonations,
+                    totalMeals: completedDonations * 10,
+                    roleDistribution
+                };
+            } catch (error: any) {
+                console.error("ADMIN STATS ERROR:", error);
+                if (error.message?.includes("permissions")) {
+                    console.error("HINT: Ensure the admin user has permission to read the users and donations collections.");
+                }
+                throw error;
+            }
         },
     });
 }
 
-export function useRecentTransactions() {
+export function useRecentTransactions(enabled: boolean = true) {
     return useQuery({
         queryKey: ["recent-transactions"],
+        enabled,
         queryFn: async () => {
             const user = auth.currentUser;
             if (!user) return [];
@@ -176,9 +214,10 @@ export function useRecentTransactions() {
     });
 }
 
-export function useSystemHistory() {
+export function useSystemHistory(enabled: boolean = true) {
     return useQuery({
         queryKey: ["system-history"],
+        enabled,
         queryFn: async () => {
             const q = query(
                 collection(db, "donations"),
@@ -195,9 +234,10 @@ export function useSystemHistory() {
     });
 }
 
-export function useDonationHistory() {
+export function useDonationHistory(enabled: boolean = true) {
     return useQuery({
         queryKey: ["donation-history"],
+        enabled,
         queryFn: async () => {
             const user = auth.currentUser;
             if (!user) return [];
@@ -223,9 +263,10 @@ export function useDonationHistory() {
     });
 }
 
-export function useClaimHistory() {
+export function useClaimHistory(enabled: boolean = true) {
     return useQuery({
         queryKey: ["claim-history"],
+        enabled,
         queryFn: async () => {
             const user = auth.currentUser;
             if (!user) return [];
@@ -251,9 +292,10 @@ export function useClaimHistory() {
     });
 }
 
-export function useActivityFeed() {
+export function useActivityFeed(enabled: boolean = true) {
     return useQuery({
         queryKey: ["activity-feed"],
+        enabled,
         queryFn: async () => {
             const user = auth.currentUser;
             if (!user) return [];

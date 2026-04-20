@@ -46,14 +46,14 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { data: role, isLoading: roleLoading } = useUserRole();
   const { data: profile } = useProfile();
-  const { data: donorStats } = useDonorStats();
-  const { data: ngoStats } = useNgoStats();
-  const { data: adminStats } = useAdminStats();
-  const { data: donationHistory } = useDonationHistory();
-  const { data: claimHistory } = useClaimHistory();
-  const { data: systemHistory } = useSystemHistory();
-  const { data: activityFeed } = useActivityFeed();
-  const { data: recentTransactions } = useRecentTransactions();
+  const { data: donorStats } = useDonorStats(role === 'donor');
+  const { data: ngoStats } = useNgoStats(role === 'ngo');
+  const { data: adminStats } = useAdminStats(role === 'admin');
+  const { data: donationHistory } = useDonationHistory(role === 'donor');
+  const { data: claimHistory } = useClaimHistory(role === 'ngo');
+  const { data: systemHistory } = useSystemHistory(role === 'admin');
+  const { data: activityFeed } = useActivityFeed(!!role);
+  const { data: recentTransactions } = useRecentTransactions(!!role);
 
   const [authed, setAuthed] = useState<boolean | null>(null);
 
@@ -64,6 +64,12 @@ export default function Dashboard() {
     });
     return () => unsubscribe();
   }, [navigate]);
+
+  useEffect(() => {
+    if (role) {
+      console.log(`%c[Auth] User logged in as: ${role.toUpperCase()}`, "color: #3b82f6; font-weight: bold; font-size: 12px;");
+    }
+  }, [role]);
 
 
   if (authed === null || roleLoading) {

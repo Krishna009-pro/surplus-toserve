@@ -50,7 +50,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </main>
       </div>
-      <Toaster />
     </SidebarProvider>
   );
 }

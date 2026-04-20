@@ -74,8 +74,12 @@ export default function AvailableFood() {
 
       setLoading(false);
       setLoadingMore(false);
-    } catch (error) {
-      console.error("Error fetching donations:", error);
+    } catch (error: any) {
+      console.error("Error fetching available food:", error);
+      if (error.message?.includes("permissions")) {
+        console.error("HINT: This usually means an ad-blocker is blocking firestore.googleapis.com or your firestore.rules need deployment.");
+      }
+      toast.error("Failed to fetch available food. Check console for details.");
       setLoading(false);
       setLoadingMore(false);
     }
