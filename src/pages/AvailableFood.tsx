@@ -44,7 +44,6 @@ export default function AvailableFood() {
       let q = query(
         collection(db, "donations"),
         where("status", "==", "available"),
-        orderBy("createdAt", "desc"),
         limit(10)
       );
 

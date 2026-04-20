@@ -1,6 +1,6 @@
 import { auth, db, storage } from "@backend/firebase";
-import { collection, addDoc, doc, getDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { doc, getDoc, collection, addDoc } from "firebase/firestore";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { useNavigate } from "react-router-dom";
 import imageCompression from 'browser-image-compression';
 import { useState } from "react";
@@ -62,23 +62,41 @@ export default function Donate() {
             useWebWorker: true
           };
           compressedFile = await imageCompression(imageFile, options);
-          
+
           // Generate a unique filename
           const fileExtension = imageFile.name.split('.').pop();
           const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExtension}`;
           const storageRef = ref(storage, `food-images/${user.uid}/${fileName}`);
-          
-          // Upload to Firebase Storage
-          console.log("Uploading image to storage...");
-          const uploadResult = await uploadBytes(storageRef, compressedFile);
-          imageUrl = await getDownloadURL(uploadResult.ref);
+
+          // Upload to Firebase Storage with a 3-second "Fail-Fast" timeout
+          console.log("Uploading image to storage (3s timeout)...");
+
+          const uploadTask = uploadBytesResumable(storageRef, compressedFile);
+
+          // Create a promise that rejects after 3 seconds and CANCELS the task
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => {
+              uploadTask.cancel(); // Stop background retries immediately
+              reject(new Error("Storage Timeout"));
+            }, 3000)
+          );
+
+          // Race the upload against the timeout
+          await Promise.race([
+            uploadTask,
+            timeoutPromise
+          ]);
+
+          imageUrl = await getDownloadURL(uploadTask.snapshot.ref);
           console.log("Image uploaded successfully:", imageUrl);
-        } catch (error) {
-          console.warn("Storage upload failed (CORS or Bucket issue), falling back to Base64:", error);
+        } catch (error: any) {
+          console.error("STORAGE ERROR OR TIMEOUT:", error.message);
+          console.warn("Switching to Safe Mode Fallback immediately...");
           try {
             // Fallback: Convert the compressed file to Base64 for direct Firestore storage
             imageUrl = await blobToBase64(compressedFile);
-            toast.info("Stored via fallback mode (Storage unavailable).");
+            console.log("Image converted to Base64 (Size: " + Math.round(imageUrl.length / 1024) + " KB)");
+            toast.info("Using Safe Mode (Local Storage).");
           } catch (fallbackErr) {
             console.error("Base64 fallback also failed:", fallbackErr);
             toast.error("Failed to process image. Continuing without it.");
@@ -86,22 +104,24 @@ export default function Donate() {
         }
       }
 
-      await addDoc(collection(db, "donations"), {
+      console.log("Saving donation to database...");
+      const docRef = await addDoc(collection(db, "donations"), {
         donorId: user.uid,
-        donorName, // Save denormalized data
+        donorName,
         foodItems,
         quantity,
         pickupAddress,
         expiryTime: new Date(expiryTime).toISOString(),
         status: 'available',
-        imageUrl, // Now storing a real URL instead of Base64
+        imageUrl,
         createdAt: new Date().toISOString()
       });
 
+      console.log("Donation successfully saved with ID:", docRef.id);
       toast.success("Donation created successfully!");
       navigate("/donations");
     } catch (error: any) {
-      console.error("Donation submission error:", error);
+      console.error("CRITICAL ERROR DURING DONATION:", error);
       if (error.message?.includes("permission")) {
         console.error("HINT: If you just registered, your profile 'Write' might have been blocked by an ad-blocker. Try refreshing or disabling ad-blockers.");
       }

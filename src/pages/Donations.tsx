@@ -23,8 +23,7 @@ export default function Donations() {
       console.log("Fetching donations for user:", user.uid);
       const q = query(
         collection(db, "donations"),
-        where("donorId", "==", user.uid),
-        orderBy("createdAt", "desc")
+        where("donorId", "==", user.uid)
       );
 
       const snapshot = await getDocs(q);
