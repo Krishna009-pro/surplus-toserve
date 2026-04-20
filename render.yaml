@@ -1,0 +1,10 @@
+services:
+  - type: static
+    name: surplus-to-serve
+    env: static
+    buildCommand: npm install && npm run build
+    staticPublishDir: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

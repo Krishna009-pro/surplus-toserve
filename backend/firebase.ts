@@ -6,13 +6,13 @@ import { getAnalytics } from "firebase/analytics";
 
 // TODO: Replace with your actual Firebase configuration
 const firebaseConfig = {
-    apiKey: "AIzaSyAJVEF-6XBgUSdKx8D9O5B1kyiQ5RYwX48",
-    authDomain: "surplus-to-serve.firebaseapp.com",
-    projectId: "surplus-to-serve",
-    storageBucket: "surplus-to-serve.firebasestorage.app",
-    messagingSenderId: "469002650345",
-    appId: "1:469002650345:web:d7daca20909f3baa272678",
-    measurementId: "G-SKY8TYBYN2"
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID,
+    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 const app = initializeApp(firebaseConfig);
